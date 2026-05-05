@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from '../../api/axios';
+import { useNotificationStore } from '../../store/notificationStore';
 import { 
   Trophy, 
   Clock, 
@@ -7,7 +8,8 @@ import {
   AlertCircle,
   TrendingUp,
   ArrowUpRight,
-  ExternalLink
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -27,12 +29,20 @@ import {
 const StudentDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { addNotification } = useNotificationStore();
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const { data } = await axios.get('/dashboard/student');
         setStats(data);
+        
+        addNotification({
+          type: 'info',
+          title: 'Welcome Back!',
+          message: 'Check your latest AI evaluation results in the dashboard.',
+          duration: 3000
+        });
       } catch (err) {
         console.error(err);
       } finally {

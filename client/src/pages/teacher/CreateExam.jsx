@@ -42,7 +42,7 @@ const CreateExam = () => {
       try {
         const [subRes, batchRes] = await Promise.all([
           axios.get('/academic/subjects'),
-          axios.get('/academic/batches') // Need to implement
+          axios.get('/academic/batches')
         ]);
         setSubjects(subRes.data);
         setBatches(batchRes.data);
@@ -226,7 +226,7 @@ const CreateExam = () => {
             </div>
             
             <button 
-              disabled={!formData.title || !formData.subjectId}
+              disabled={!formData.title || !formData.subjectId || !formData.batchId}
               onClick={() => setStep(2)}
               className="btn btn-primary w-full py-4 text-lg"
             >

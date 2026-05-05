@@ -41,11 +41,11 @@ const ResultDetail = () => {
   if (loading) return <div>Loading...</div>;
 
   const radarData = [
-    { subject: 'Understanding', A: 85 },
-    { subject: 'Reasoning', A: 70 },
-    { subject: 'Depth', A: 60 },
-    { subject: 'Correctness', A: 90 },
-    { subject: 'Originality', A: 50 },
+    { subject: 'Understanding', A: attempt.responses.reduce((acc, r) => acc + (r.evaluationResult?.understandingScore || 0), 0) / (attempt.responses.filter(r => r.responseType !== 'mcq').length || 1) },
+    { subject: 'Reasoning', A: attempt.responses.reduce((acc, r) => acc + (r.evaluationResult?.reasoningScore || 0), 0) / (attempt.responses.filter(r => r.responseType !== 'mcq').length || 1) },
+    { subject: 'Depth', A: attempt.responses.reduce((acc, r) => acc + (r.evaluationResult?.depthScore || 0), 0) / (attempt.responses.filter(r => r.responseType !== 'mcq').length || 1) },
+    { subject: 'Correctness', A: attempt.responses.reduce((acc, r) => acc + (r.evaluationResult?.correctnessScore || 0), 0) / (attempt.responses.filter(r => r.responseType !== 'mcq').length || 1) },
+    { subject: 'Originality', A: attempt.responses.reduce((acc, r) => acc + (r.evaluationResult?.originalityScore || 0), 0) / (attempt.responses.filter(r => r.responseType !== 'mcq').length || 1) },
   ];
 
   return (
@@ -77,15 +77,20 @@ const ResultDetail = () => {
               <div className="grid grid-cols-3 gap-8">
                 <div>
                   <p className="text-xs opacity-60 mb-1">Score Obtained</p>
-                  <p className="text-3xl font-bold">78<span className="text-sm opacity-40">/100</span></p>
+                  <p className="text-3xl font-bold">{attempt.totalScore}<span className="text-sm opacity-40">/{attempt.totalMaxMarks}</span></p>
                 </div>
                 <div>
                   <p className="text-xs opacity-60 mb-1">Grade</p>
-                  <p className="text-3xl font-bold text-success">A</p>
+                  <p className="text-3xl font-bold text-success">
+                    {attempt.totalScore / attempt.totalMaxMarks >= 0.9 ? 'S' :
+                     attempt.totalScore / attempt.totalMaxMarks >= 0.8 ? 'A' :
+                     attempt.totalScore / attempt.totalMaxMarks >= 0.7 ? 'B' :
+                     attempt.totalScore / attempt.totalMaxMarks >= 0.6 ? 'C' : 'D'}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs opacity-60 mb-1">Percentile</p>
-                  <p className="text-3xl font-bold">84th</p>
+                  <p className="text-xs opacity-60 mb-1">Percentage</p>
+                  <p className="text-3xl font-bold">{Math.round((attempt.totalScore / attempt.totalMaxMarks) * 100)}%</p>
                 </div>
               </div>
             </div>

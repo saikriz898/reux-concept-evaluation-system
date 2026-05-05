@@ -41,6 +41,7 @@ const getExamForStudent = async (examId) => {
   const exam = await db.query.exams.findFirst({
     where: eq(exams.id, examId),
     with: {
+      subject: true,
       examQuestions: {
         with: {
           question: true

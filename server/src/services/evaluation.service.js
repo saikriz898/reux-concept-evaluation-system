@@ -29,7 +29,7 @@ class EvaluationService {
       if (response.responseType === 'mcq') {
         await this.evaluateMCQ(response);
       } else {
-        await this.evaluateSubjective(response);
+        await this.evaluateSubjective(response, attemptData.studentId);
       }
     }
 
@@ -53,25 +53,39 @@ class EvaluationService {
     });
   }
 
-  async evaluateSubjective(response) {
+  async evaluateSubjective(response, studentId) {
     const prompt = `
-      You are an expert academic evaluator for Sri College of Engineering. 
-      Evaluate the following student response based on conceptual understanding and reasoning.
+      You are an elite academic evaluator at Sri College of Engineering. 
+      Your task is to provide a high-fidelity, rigorous evaluation of a student's technical response.
       
       Question: ${response.question.questionText}
       Student Response: ${response.explanationText || response.codeText}
-      Expected Keywords: ${response.question.expectedKeywords?.join(', ')}
+      Expected Technical Keywords: ${response.question.expectedKeywords?.join(', ')}
       Max Marks: ${response.question.marks}
 
-      Provide a structured evaluation in JSON format with the following fields:
-      - understanding_score (0 to 30)
-      - reasoning_score (0 to 25)
-      - depth_score (0 to 20)
-      - correctness_score (0 to 15)
-      - originality_score (0 to 10)
-      - overall_score (calculated out of ${response.question.marks})
-      - feedback (detailed constructive feedback)
-      - weak_concepts (array of strings identifying specific missing concepts)
+      CRITICAL EVALUATION CRITERIA:
+      1. Keyword Accuracy: Check if the student used technical terms correctly.
+      2. Conceptual Depth: Does the response explain the "why" and "how", or just state facts?
+      3. Reasoning: Is there a logical flow in the explanation?
+      4. Engineering Standards: Does the response meet the technical rigor expected at an engineering college?
+
+      MARKING INSTRUCTIONS:
+      - Distribute the ${response.question.marks} marks across the categories below.
+      - DO NOT give perfect marks unless the answer is flawless.
+      - AVOID repetitive or "safe" middle-ground scores. Be decisive.
+      - If the student has just copied parts of the question, give a score of 0.
+
+      Provide a structured evaluation in JSON format:
+      {
+        "understanding_score": (0 to 30),
+        "reasoning_score": (0 to 25),
+        "depth_score": (0 to 20),
+        "correctness_score": (0 to 15),
+        "originality_score": (0 to 10),
+        "overall_score": (A realistic total out of ${response.question.marks} based on weighted averages of above),
+        "feedback": "Detailed constructive feedback referencing specific technical points",
+        "weak_concepts": ["concept1", "concept2"]
+      }
 
       Respond ONLY with the JSON object.
     `;
@@ -88,7 +102,7 @@ class EvaluationService {
             content: prompt,
           },
         ],
-        model: "llama3-70b-8192",
+        model: "llama-3.3-70b-versatile",
         response_format: { type: "json_object" },
       });
 
@@ -98,12 +112,12 @@ class EvaluationService {
         responseId: response.id,
         attemptId: response.attemptId,
         evaluatedBy: 'ai',
-        understandingScore: result.understanding_score,
-        reasoningScore: result.reasoning_score,
-        depthScore: result.depth_score,
-        correctnessScore: result.correctness_score,
-        originalityScore: result.originality_score,
-        overallScore: result.overall_score,
+        understandingScore: Math.round(result.understanding_score || 0),
+        reasoningScore: Math.round(result.reasoning_score || 0),
+        depthScore: Math.round(result.depth_score || 0),
+        correctnessScore: Math.round(result.correctness_score || 0),
+        originalityScore: Math.round(result.originality_score || 0),
+        overallScore: Math.round(result.overall_score || 0),
         maxMarks: response.question.marks,
         feedback: result.feedback,
         aiRawResponse: result,
@@ -115,7 +129,7 @@ class EvaluationService {
           // Check if already exists for student
           const existing = await db.query.weakConcepts.findFirst({
             where: and(
-              eq(weakConcepts.studentId, response.studentId),
+              eq(weakConcepts.studentId, studentId),
               eq(weakConcepts.conceptTag, concept)
             )
           });
@@ -129,7 +143,7 @@ class EvaluationService {
               .where(eq(weakConcepts.id, existing.id));
           } else {
             await db.insert(weakConcepts).values({
-              studentId: response.studentId,
+              studentId: studentId,
               subjectId: response.question.subjectId,
               conceptTag: concept,
               avgScore: result.overall_score

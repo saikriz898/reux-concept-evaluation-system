@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const examService = require('../services/exam.service');
 const { db } = require('../config/db');
-const { exams, enrollments } = require('../db/schema');
-const { eq, desc } = require('drizzle-orm');
+const { exams, enrollments, attempts } = require('../db/schema');
+const { eq, desc, and } = require('drizzle-orm');
 const { verifyToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const { asyncHandler } = require('../utils/asyncHandler');
@@ -37,20 +37,33 @@ router.get('/student', verifyToken, asyncHandler(async (req, res) => {
 
   if (!enrollment) return res.status(200).json([]);
 
-  const studentExams = await db.query.exams.findMany({
-    where: eq(exams.batchId, enrollment.batchId),
-    with: {
-      subject: true
-    },
-    orderBy: [desc(exams.startTime)]
-  });
+  const [studentExams, userAttempts] = await Promise.all([
+    db.query.exams.findMany({
+      where: and(
+        eq(exams.batchId, enrollment.batchId),
+        eq(exams.isPublished, true)
+      ),
+      with: {
+        subject: true
+      },
+      orderBy: [desc(exams.startTime)]
+    }),
+    db.query.attempts.findMany({
+      where: eq(attempts.studentId, req.user.userId)
+    })
+  ]);
 
   // Add status helper
   const now = new Date();
-  const result = studentExams.map(e => ({
-    ...e,
-    status: now > e.endTime ? 'closed' : now < e.startTime ? 'upcoming' : 'ongoing'
-  }));
+  const result = studentExams.map(e => {
+    const existingAttempt = userAttempts.find(a => a.examId === e.id);
+    return {
+      ...e,
+      attemptStatus: existingAttempt?.status || null,
+      attemptId: existingAttempt?.id || null,
+      status: now > e.endTime ? 'closed' : now < e.startTime ? 'upcoming' : 'ongoing'
+    };
+  });
 
   res.status(200).json(result);
 }));

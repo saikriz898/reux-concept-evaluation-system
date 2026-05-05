@@ -20,8 +20,7 @@ const app = express();
 app.use(helmet());
 const allowedOrigins = [
   process.env.CLIENT_URL,
-  'http://localhost:5173',
-  'http://localhost:5174'
+  'https://reux-concept-evaluation-system-git-0ed484-saikriz898s-projects.vercel.app'
 ].filter(Boolean);
 
 app.use(cors({

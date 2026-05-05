@@ -149,16 +149,19 @@ const ExamAttempt = () => {
     }
   };
 
-  if (!exam) return (
+  if (!exam || !exam.examQuestions || exam.examQuestions.length === 0) return (
     <div className="flex items-center justify-center h-screen bg-slate-50">
-      <div className="text-center">
-        <Loader2 className="animate-spin text-primary mx-auto mb-4" size={48} />
-        <p className="text-slate-500 font-medium">Loading your exam environment...</p>
+      <div className="text-center max-w-md p-8 card">
+        <AlertTriangle className="text-warning mx-auto mb-4" size={48} />
+        <h2 className="text-xl font-bold mb-2">No Questions Found</h2>
+        <p className="text-slate-500 mb-6">This exam doesn't seem to have any questions. Please contact your administrator.</p>
+        <button onClick={() => navigate('/student/dashboard')} className="btn btn-primary w-full">Back to Dashboard</button>
       </div>
     </div>
   );
 
-  const currentQuestion = exam.examQuestions[currentQuestionIndex].question;
+  const currentQuestion = exam.examQuestions[currentQuestionIndex]?.question;
+  if (!currentQuestion) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">

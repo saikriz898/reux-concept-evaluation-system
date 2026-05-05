@@ -1,56 +1,64 @@
-const Groq = require('groq-sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { db } = require('../config/db');
 const { responses, evaluationResults, attempts, weakConcepts } = require('../db/schema');
 const { eq, and } = require('drizzle-orm');
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 class EvaluationService {
   /**
    * Orchestrate evaluation for an entire attempt
    */
   async evaluateAttempt(attemptId) {
-    const attemptData = await db.query.attempts.findFirst({
-      where: eq(attempts.id, attemptId),
-      with: {
-        responses: {
-          with: {
-            question: true
+    try {
+      const attemptData = await db.query.attempts.findFirst({
+        where: eq(attempts.id, attemptId),
+        with: {
+          responses: {
+            with: {
+              question: true
+            }
           }
         }
-      }
-    });
+      });
 
-    if (!attemptData) return;
+      if (!attemptData) return;
 
-    for (const response of attemptData.responses) {
-      if (response.responseType === 'mcq') {
-        await this.evaluateMCQ(response);
-      } else {
-        await this.evaluateSubjective(response, attemptData.studentId);
+      for (const response of attemptData.responses) {
+        if (response.responseType === 'mcq') {
+          await this.evaluateMCQ(response);
+        } else {
+          await this.evaluateSubjective(response, attemptData.studentId);
+        }
       }
+
+      // Update attempt status
+      await db.update(attempts)
+        .set({ status: 'evaluated' })
+        .where(eq(attempts.id, attemptId));
+    } catch (error) {
+      console.error('Orchestration Error:', error);
     }
-
-    // Update attempt status
-    await db.update(attempts)
-      .set({ status: 'evaluated' })
-      .where(eq(attempts.id, attemptId));
   }
 
   async evaluateMCQ(response) {
-    const isCorrect = response.selectedOptionId === response.question.correctOptionId;
-    const score = isCorrect ? response.question.marks : 0;
+    try {
+      const isCorrect = response.selectedOptionId === response.question.correctOptionId;
+      const score = isCorrect ? response.question.marks : 0;
 
-    await db.insert(evaluationResults).values({
-      responseId: response.id,
-      attemptId: response.attemptId,
-      evaluatedBy: 'ai',
-      overallScore: score,
-      maxMarks: response.question.marks,
-      feedback: isCorrect ? 'Correct answer.' : `Incorrect. The correct answer was ${response.question.correctOptionId}.`,
-    });
+      await db.insert(evaluationResults).values({
+        responseId: response.id,
+        attemptId: response.attemptId,
+        evaluatedBy: 'ai',
+        overallScore: score,
+        maxMarks: response.question.marks,
+        feedback: isCorrect ? 'Correct answer.' : `Incorrect answer.`,
+      });
+    } catch (error) {
+      console.error('MCQ Evaluation Error:', error);
+    }
   }
 
   async evaluateSubjective(response, studentId) {
@@ -72,7 +80,6 @@ class EvaluationService {
       MARKING INSTRUCTIONS:
       - Distribute the ${response.question.marks} marks across the categories below.
       - DO NOT give perfect marks unless the answer is flawless.
-      - AVOID repetitive or "safe" middle-ground scores. Be decisive.
       - If the student has just copied parts of the question, give a score of 0.
 
       Provide a structured evaluation in JSON format:
@@ -82,31 +89,19 @@ class EvaluationService {
         "depth_score": (0 to 20),
         "correctness_score": (0 to 15),
         "originality_score": (0 to 10),
-        "overall_score": (A realistic total out of ${response.question.marks} based on weighted averages of above),
-        "feedback": "Detailed constructive feedback referencing specific technical points",
+        "overall_score": (A realistic total out of ${response.question.marks}),
+        "feedback": "Detailed constructive feedback",
         "weak_concepts": ["concept1", "concept2"]
       }
 
-      Respond ONLY with the JSON object.
+      Respond ONLY with the JSON object. Respond in JSON format.
     `;
 
     try {
-      const completion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: "system",
-            content: "You are a professional academic evaluator. Always respond in valid JSON.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        model: "llama-3.3-70b-versatile",
-        response_format: { type: "json_object" },
-      });
-
-      const result = JSON.parse(completion.choices[0].message.content);
+      const resultGen = await model.generateContent(prompt);
+      const resText = resultGen.response.text();
+      const cleanedJson = resText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const result = JSON.parse(cleanedJson);
 
       await db.insert(evaluationResults).values({
         responseId: response.id,
@@ -126,7 +121,6 @@ class EvaluationService {
       // Update weak concepts
       if (result.weak_concepts && result.weak_concepts.length > 0) {
         for (const concept of result.weak_concepts) {
-          // Check if already exists for student
           const existing = await db.query.weakConcepts.findFirst({
             where: and(
               eq(weakConcepts.studentId, studentId),
@@ -153,7 +147,7 @@ class EvaluationService {
       }
 
     } catch (error) {
-      console.error('Groq Evaluation Error:', error);
+      console.error('Gemini Evaluation Error:', error);
     }
   }
 }

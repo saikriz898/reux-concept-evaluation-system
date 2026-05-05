@@ -4,12 +4,19 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { verifyToken } = require('../middleware/auth');
 const { asyncHandler } = require('../utils/asyncHandler');
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Helper to get model
+const getModel = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error('❌ GEMINI_API_KEY is missing in environment variables');
+  }
+  const genAI = new GoogleGenerativeAI(apiKey || '');
+  return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+};
 
 router.post('/chat', verifyToken, asyncHandler(async (req, res) => {
   const { message, history } = req.body;
+  const model = getModel();
 
   const systemPrompt = `
     You are MindBridge AI, a specialized academic assistant for Sri College of Engineering.
@@ -29,9 +36,6 @@ router.post('/chat', verifyToken, asyncHandler(async (req, res) => {
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.content }],
       })),
-      generationConfig: {
-        maxOutputTokens: 1000,
-      },
     });
 
     const prompt = `${systemPrompt}\n\nUser Question: ${message}`;
@@ -46,13 +50,14 @@ router.post('/chat', verifyToken, asyncHandler(async (req, res) => {
     console.error('Gemini AI Error:', err);
     res.status(500).json({ 
       success: false, 
-      message: 'AI service is currently unavailable. Please check your API key.' 
+      message: err.message || 'AI service is currently unavailable. Please check your API key.' 
     });
   }
 }));
 
 router.post('/generate-questions', verifyToken, asyncHandler(async (req, res) => {
   const { topic, difficulty } = req.body;
+  const model = getModel();
 
   const systemPrompt = `
     You are an AI academic question generator for Sri College of Engineering.
@@ -75,7 +80,6 @@ router.post('/generate-questions', verifyToken, asyncHandler(async (req, res) =>
     const response = await result.response;
     let text = response.text();
     
-    // Clean up JSON if model includes markdown blocks
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const data = JSON.parse(text);

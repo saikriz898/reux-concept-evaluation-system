@@ -1,0 +1,43 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon src/app.js",
+    "start": "node src/app.js",
+    "generate": "drizzle-kit generate",
+    "migrate": "node src/db/migrate.js",
+    "seed": "node src/db/seed.js",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.3",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.2.0",
+    "cors": "^2.8.5",
+    "date-fns": "^3.6.0",
+    "dompurify": "^3.1.5",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.30.10",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "groq-sdk": "^1.1.2",
+    "helmet": "^7.1.0",
+    "jsdom": "^24.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "morgan": "^1.10.0",
+    "nodemailer": "^6.9.13",
+    "pg": "^8.11.5",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.21.4",
+    "nodemon": "^3.1.0",
+    "supertest": "^7.0.0",
+    "vitest": "^1.6.0"
+  }
+}
